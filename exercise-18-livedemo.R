@@ -1,6 +1,11 @@
 library(tidyverse)
 library(ggplot2)
 library(tidymodels)
+library(parsnip)
+library(randomForest)
+library(NeuralNetTools)
+library(bonsai)
+library(plotly)
 
 # Ingest Data
 # URLs for COVID-19 case data and census population data
@@ -121,3 +126,32 @@ ggplot(predictions, aes(x = logC, y = .pred)) +
        x = "Actual (Log10)", 
        y = "Predicted (Log10)") + 
   theme_minimal()
+
+# Live Demo Weds April 9
+?boost_tree
+
+b_model_tuned = boost_tree(trees = tune(), 
+                           tree_depth = tune(), 
+                           min_n = tune()) %>% 
+  set_mode("regression") %>% 
+  set_engine("lightgbm")
+
+wf_tune <- workflow(rec, b_model_tuned)
+
+covid_metric = metric_set(mae, rsq, rmse)
+
+dials <- extract_parameter_set_dials(wf_tune)
+dials$object
+
+my.grid <- dials %>% 
+  grid_latin_hypercube(size = 20)
+
+plotly::plot_ly(my.grid, x=~trees, y= ~min_n, z= ~tree_depth)
+
+model_params <- tune_grid(
+  wf_tune, 
+  resamples = folds, 
+  grid = my.grid, 
+  metrics = covid_metric
+)
+
